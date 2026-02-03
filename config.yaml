@@ -17,9 +17,9 @@ svm:
 
 # VOLUME SETTINGS
 volume:
-  name: vol_data_01                
-  vserver: svm_1_cluster           
-  aggregate: cluster1_01_SSD_1                ¡
+  name: vol_data_01
+  vserver: svm_1_cluster
+  aggregate: cluster1_01_SSD_1
   size: 500GB
   security_style: unix
   junction_path: "/vol_data_01"       
