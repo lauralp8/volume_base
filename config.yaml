@@ -24,3 +24,4 @@ volume:
   security_style: "unix"              # Security style: unix, ntfs, mixed
   junction_path: "/vol_data_01"       # Junction path for NAS access
   export_policy: "default"            # Export policy name
+  unix_permissions: "rwxrwxrwx"       # UNIX permissions (symbolic: rwxrwxrwx = 0777)
