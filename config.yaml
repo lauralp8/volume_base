@@ -7,21 +7,21 @@
 
 # CLUSTER CONNECTION SETTINGS
 cluster:
-  host: "192.168.1.100"               # IP or hostname of the NetApp cluster
-  username: "admin"                   # Administrator username
-  password: "password123"             # Administrator password
+  host: cluster1.demo.netapp.com            
+  username: admin
+  password: "Netapp1!"
 
 # STORAGE VIRTUAL MACHINE (SVM) SETTINGS
 svm:
-  name: "svm_production"              # Name of the SVM
+  name: svm_1_cluster
 
 # VOLUME SETTINGS
 volume:
-  name: "vol_data_01"                 # Name of the volume
-  vserver: "svm_production"           # SVM where volume will be created
-  aggregate: "aggr1"                  # Aggregate name where volume will be created
-  size: "100GB"                       # Volume size (e.g., 20MB, 1GB, 5TB)
-  security_style: "unix"              # Security style: unix, ntfs, mixed
-  junction_path: "/vol_data_01"       # Junction path for NAS access
-  export_policy: "default"            # Export policy name
-  unix_permissions: "rwxrwxrwx"       # UNIX permissions (symbolic: rwxrwxrwx = 0777)
+  name: vol_data_01                
+  vserver: svm_1_cluster           
+  aggregate: cluster1_01_SSD_1                ¡
+  size: 500GB
+  security_style: unix
+  junction_path: "/vol_data_01"       
+  export_policy: default
+  unix_permissions: rwxrwxrwx
