@@ -1,0 +1,26 @@
+# ============================================================================
+# NETAPP ONTAP CONFIGURATION FILE
+# ============================================================================
+# Configuration file for NetApp ONTAP automation scripts
+# Version: 1.0.0
+# ============================================================================
+
+# CLUSTER CONNECTION SETTINGS
+cluster:
+  host: "192.168.1.100"               # IP or hostname of the NetApp cluster
+  username: "admin"                   # Administrator username
+  password: "password123"             # Administrator password
+
+# STORAGE VIRTUAL MACHINE (SVM) SETTINGS
+svm:
+  name: "svm_production"              # Name of the SVM
+
+# VOLUME SETTINGS
+volume:
+  name: "vol_data_01"                 # Name of the volume
+  vserver: "svm_production"           # SVM where volume will be created
+  aggregate: "aggr1"                  # Aggregate name where volume will be created
+  size: "100GB"                       # Volume size (e.g., 20MB, 1GB, 5TB)
+  security_style: "unix"              # Security style: unix, ntfs, mixed
+  junction_path: "/vol_data_01"       # Junction path for NAS access
+  export_policy: "default"            # Export policy name

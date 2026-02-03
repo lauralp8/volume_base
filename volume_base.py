@@ -28,7 +28,7 @@ Version: 1.0.0
 # IMPORTS
 # ============================================================================
 from netapp_ontap import config, HostConnection, NetAppRestError
-from netapp_ontap.resources import Cluster, Svm, FcpService, FcInterface, IpInterface, EmsEvent
+from netapp_ontap.resources import Cluster, EmsEvent, Volume
 import yaml
 import json
 import os
