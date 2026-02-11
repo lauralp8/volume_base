@@ -1,0 +1,8 @@
+# NetApp ONTAP Python Client Library
+netapp-ontap>=9.14.0
+
+# YAML parser
+PyYAML>=6.0
+
+# Requests (dependencia de netapp-ontap)
+requests>=2.31.0

@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-NetApp ONTAP SVM Creation and Configuration Script
+NetApp ONTAP Volume Management Script
 
-This script automates the creation and configuration of Storage Virtual Machines (SVMs)
-on NetApp ONTAP systems using the NetApp ONTAP REST API Python Client Library.
+This script automates the creation and management of volumes on NetApp ONTAP systems
+using the NetApp ONTAP REST API Python Client Library.
 
 Features:
-    - SVM creation with custom parameters
-    - FCP service configuration
-    - Multiple network interfaces (FCP LIFs)
-    - Management interface creation
-    - Protocol configuration
+    - Volume creation with custom parameters
+    - Volume modification (UNIX permissions)
+    - Automated logging and verification
+    - Event log retrieval
     - Comprehensive error handling and validation
 
 Requirements:
@@ -39,10 +38,10 @@ from datetime import datetime
 # SCRIPT INITIALIZATION
 # ============================================================================
 print("\n" + "="*70)
-print("  NetApp ONTAP FCP SVM Creation Script")
+print("  NetApp ONTAP Volume Management Script")
 print("  Using NetApp ONTAP Python Client Library")
 print("="*70)
-print("\n[*] Initializing SVM creation workflow...")
+print("\n[*] Initializing volume management workflow...")
 
 
 # ============================================================================
@@ -54,7 +53,7 @@ def config_loader(path="config.yaml"):
     Carga la configuración desde un archivo YAML con validación completa
     
     Lee el archivo de configuración y valida que contenga las secciones
-    necesarias para crear una SVM en NetApp ONTAP.
+    necesarias para gestionar volúmenes en NetApp ONTAP.
     
     Args:
         path: Ruta al archivo de configuración (por defecto 'config.yaml')
@@ -72,12 +71,12 @@ def config_loader(path="config.yaml"):
         # VALIDACIONES
         # Validar que el archivo no esté vacío
         if config_data is None:
-            print(f"[ERROR] File '{path}' is empty or doen't contain valid YAML")
+            print(f"[ERROR] File '{path}' is empty or doesn't contain valid YAML")
             return None
         
         # Validar estructura: debe contener seccion 'cluster'
         if 'cluster' not in config_data:
-            print(f"[ERROR]Incomplete configuration: missing 'cluster' section")
+            print(f"[ERROR] Incomplete configuration: missing 'cluster' section")
             return None
         
         # Validar estructura: debe contener seccion 'svm'
@@ -429,48 +428,24 @@ def volume_modify(volume_config):
         # Convertir permisos de formato simbólico (rwxrwxrwx) u octal a entero
         permissions_str = volume_config['unix_permissions']
         
-        def convert_permissions_to_octal(perm_str):
-            """
-            Convierte permisos de formato simbólico (rwxrwxrwx) u octal a entero
-            
-            Args:
-                perm_str: String con permisos en formato 'rwxrwxrwx' o '0777'
-            
-            Returns:
-                int: Valor octal de los permisos
-            """
-            # Si es formato octal (empieza con 0 o es numérico)
-            if perm_str.startswith('0') or perm_str.isdigit():
-                try:
-                    return int(perm_str, 8)
-                except ValueError:
-                    raise ValueError(f"Invalid octal format: {perm_str}")
-            
-            # Si es formato simbólico (rwxrwxrwx)
-            if len(perm_str) == 9:
-                perms = {'r': 4, 'w': 2, 'x': 1, '-': 0}
-                try:
-                    # Usuario (owner)
-                    user = perms[perm_str[0]] + perms[perm_str[1]] + perms[perm_str[2]]
-                    # Grupo (group)
-                    group = perms[perm_str[3]] + perms[perm_str[4]] + perms[perm_str[5]]
-                    # Otros (others)
-                    others = perms[perm_str[6]] + perms[perm_str[7]] + perms[perm_str[8]]
-                    
-                    # Combinar en valor octal
-                    return int(f"{user}{group}{others}", 8)
-                except (KeyError, ValueError):
-                    raise ValueError(f"Invalid symbolic format: {perm_str}")
-            
-            raise ValueError(f"Unrecognized permission format: {perm_str}")
-        
         try:
-            permissions_value = convert_permissions_to_octal(permissions_str)
+            # Si es formato octal (0777, 0755, etc)
+            if permissions_str.startswith('0') or permissions_str.isdigit():
+                permissions_value = int(permissions_str, 8)
+            # Si es formato simbólico (rwxrwxrwx)
+            elif len(permissions_str) == 9:
+                perms = {'r': 4, 'w': 2, 'x': 1, '-': 0}
+                owner = perms[permissions_str[0]] + perms[permissions_str[1]] + perms[permissions_str[2]]
+                group = perms[permissions_str[3]] + perms[permissions_str[4]] + perms[permissions_str[5]]
+                others = perms[permissions_str[6]] + perms[permissions_str[7]] + perms[permissions_str[8]]
+                permissions_value = int(f"{owner}{group}{others}", 8)
+            else:
+                raise ValueError(f"Expected formats: 'rwxrwxrwx' or '0777'")
+            
             print(f"[*] Unix permissions to apply: {permissions_str} = {oct(permissions_value)}")
-        except ValueError as e:
+        except (ValueError, KeyError) as e:
             print(f"[ERROR] Invalid unix_permissions format: {permissions_str}")
             print(f"[ERROR] {str(e)}")
-            print(f"[ERROR] Expected formats: 'rwxrwxrwx' or '0777'")
             return False
         
         # Crear objeto Volume con el UUID encontrado para modificarlo
@@ -671,7 +646,7 @@ if not cluster_connection(config_data['cluster']):
     print("[ERROR] Fix connection issues before continuing")
     exit(1)
 
-print("\n[+] All pre-checks passed - Ready to create SVM")
+print("\n[+] All pre-checks passed - Ready to manage volumes")
 
 # VOLUME CREATION STEPS
 # Crear volumen usando la configuración del archivo YAML
@@ -700,8 +675,14 @@ else:
     exit(1)
 
 
-# Obtener event logs de la cabina como backup
+# EVENT LOGS BACKUP
+# Obtener event logs de la cabina como backup de la operación
 if get_event_logs(max_records=100):
     print("\n[SUCCESS] Event logs backup completed!")
 else:
     print("\n[WARNING] Event logs backup failed (non-critical)")
+
+print("\n" + "="*80)
+print("  VOLUME MANAGEMENT WORKFLOW COMPLETED SUCCESSFULLY")
+print("="*80)
+print("\n[+] All operations finished. Check logs/ directory for detailed information.")
