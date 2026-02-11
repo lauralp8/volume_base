@@ -127,10 +127,6 @@ def save_to_log(operation_name, data):
     
     Returns:
         str: Ruta del archivo creado
-    
-    Ejemplo:
-        save_to_log('create_svm', svm_data)
-        # Crea: logs/create_svm_20260129_143025.json
     """
     try:
         # Crear carpeta logs si no existe
@@ -248,10 +244,6 @@ def cluster_connection(cluster_config):
 def volume_create(volume_config):
     """
     Crea un volumen en la cabina NetApp ONTAP usando la REST API
-    
-    Basado en el comando:
-    volume create -vserver vservername -volume volumename -aggregate aggrname 
-                  -size size -security-style style -junction-path path -policy policy
     
     Args:
         volume_config: Diccionario con las configuraciones del volumen desde config.yaml
@@ -382,9 +374,6 @@ def volume_create(volume_config):
 def volume_modify(volume_config):
     """
     Modifica los permisos UNIX de un volumen en la cabina NetApp ONTAP
-    
-    Basado en el comando:
-    volume modify -vserver vserver -volume volumen -unix-permissions ---rwxrwxrwx
     
     Args:
         volume_config: Diccionario con las configuraciones del volumen desde config.yaml
