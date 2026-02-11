@@ -1,0 +1,463 @@
+# NetApp ONTAP Volume Management Script
+
+Script automatizado para la creación y gestión de volúmenes en NetApp ONTAP usando la librería oficial Python Client Library de NetApp ONTAP.
+
+## Descripción
+
+Este script de Python automatiza todo el proceso de creación y configuración de volúmenes en NetApp ONTAP, incluyendo:
+
+- Creación de volúmenes con parámetros personalizados
+- Configuración de security style, junction path y export policies
+- Modificación de permisos UNIX de volúmenes
+- Backup automático de event logs del cluster
+- Sistema de logging con timestamp para todas las operaciones
+- Validación y verificación automática de cambios
+
+## Requisitos
+
+### Software
+- Python 3.7 o superior
+- NetApp ONTAP 9.6 o superior
+- Acceso de red al cluster NetApp
+- Credenciales de administrador del cluster
+
+### Dependencias Python
+```bash
+pip install -r requirements.txt
+```
+
+## Estructura del Proyecto
+
+```
+volume_base/
+├── volume_base.py     # Script principal
+├── config.yaml        # Archivo de configuración
+├── requirements.txt   # Dependencias Python
+├── README             # Esta documentación
+└── logs/              # Logs JSON generados automáticamente
+```
+
+## Configuración
+
+Edita el archivo `config.yaml` con los parámetros de tu entorno. El archivo incluye las siguientes secciones:
+
+### cluster
+Configuración de conexión al cluster NetApp:
+- `host`: Hostname o IP del cluster
+- `username`: Usuario administrador
+- `password`: Contraseña
+
+### svm
+Configuración de la Storage Virtual Machine:
+- `name`: Nombre de la SVM donde se creará el volumen
+
+### volume
+Configuración del volumen a crear y gestionar:
+- `name`: Nombre del volumen a crear
+- `vserver`: Nombre de la SVM (debe coincidir con svm.name)
+- `aggregate`: Agregado donde se creará el volumen
+- `size`: Tamaño del volumen (ej: 500GB, 1TB)
+- `security_style`: Estilo de seguridad (unix/ntfs/mixed)
+- `junction_path`: Ruta de montaje NAS (ej: /vol_data_01)
+- `export_policy`: Política de exportación NFS (default: default)
+- `unix_permissions`: Permisos UNIX (formato rwxrwxrwx o 0777)
+
+Para ver ejemplos de configuración, consulta el archivo `config.yaml` incluido en el proyecto.
+
+## Sistema de Logging
+
+El script implementa un sistema de logging automático que captura datos REALES de la cabina NetApp después de cada operación:
+
+### Características
+- **Timestamp automático**: Formato YYYYMMDD_HHMMSS (ej: 20260211_124530)
+- **Formato JSON**: Datos estructurados y fáciles de procesar
+- **Datos de cabina**: GET real desde ONTAP, no configuración enviada
+- **Directorio logs/**: Se crea automáticamente si no existe
+
+### Logs Generados
+
+1. **volume_create_YYYYMMDD_HHMMSS.json**
+   - UUID del volumen
+   - Nombre, estado, estilo, tipo
+   - SVM asociada
+   - Agregado(s) utilizado(s)
+   - Tamaño del volumen
+   - Configuración NAS (security style, junction path, export policy)
+   - Timestamp de creación
+   - Configuración de entrada utilizada
+
+2. **volume_modify_YYYYMMDD_HHMMSS.json**
+   - UUID del volumen
+   - Información completa del volumen post-modificación
+   - Permisos UNIX aplicados (octal y decimal)
+   - Verificación de permisos
+   - Configuración de entrada utilizada
+
+3. **event_logs_YYYYMMDD_HHMMSS.json**
+   - Backup de eventos del cluster (últimos 100 por defecto)
+   - Index, timestamp, nodo, severidad, evento
+   - Total de eventos recuperados
+
+## Uso
+
+### Ejecución Básica
+```bash
+python volume_base.py
+```
+
+### Flujo de Ejecución
+
+1. **Carga de configuración** - Lee y valida `config.yaml`
+2. **Conexión al cluster** - Establece conexión y verifica credenciales
+3. **Creación de volumen** - Crea el volumen con parámetros especificados → Guarda log
+4. **Modificación de permisos** - Configura permisos UNIX del volumen → Guarda log
+5. **Verificación** - Valida que los permisos se aplicaron correctamente
+6. **Event Logs Backup** - Obtiene logs de eventos del cluster → Guarda log
+7. **Finalización** - Todos los logs disponibles en directorio `logs/`
+
+## API REST de NetApp
+
+Este script utiliza la **NetApp ONTAP Python Client Library** que internamente usa la API REST oficial:
+
+### Endpoints Utilizados (a través de la librería)
+
+#### POST (Creación)
+- **Volume.post()** - Crea un nuevo volumen
+  - Endpoint REST: `POST /api/storage/volumes`
+  - Parámetros: name, svm, aggregates, size, nas (security_style, path, export_policy)
+
+#### PATCH (Modificación)
+- **Volume.patch()** - Modifica propiedades de un volumen
+  - Endpoint REST: `PATCH /api/storage/volumes/{uuid}`
+  - Parámetros: nas.unix_permissions
+
+#### GET (Consulta)
+- **Volume.get()** - Obtiene detalles completos de un volumen
+  - Endpoint REST: `GET /api/storage/volumes/{uuid}`
+  - Obtiene todos los campos del volumen
+- **Volume.get_collection()** - Busca volúmenes por nombre y SVM
+  - Endpoint REST: `GET /api/storage/volumes`
+  - Filtros: name, svm.name
+- **EmsEvent.get_collection()** - Obtiene eventos del sistema
+  - Endpoint REST: `GET /api/support/ems/events`
+  - Parámetros: max_records
+- **Cluster.get()** - Obtiene información del cluster
+  - Endpoint REST: `GET /api/cluster`
+  - Usado para verificación de conexión
+
+**Documentación oficial**: 
+- [NetApp ONTAP REST API](https://library.netapp.com/ecmdocs/ECMLP3351667/html/)
+- [NetApp ONTAP Python Client Library](https://pypi.org/project/netapp-ontap/)
+
+## Registro de Funciones
+
+### Funciones de Configuración y Utilidades
+
+#### config_loader(path="config.yaml")
+Carga y valida el archivo de configuración YAML.
+- **Entrada**: Ruta al archivo config.yaml
+- **Salida**: Diccionario con configuración o None si falla
+- **Validaciones**: Verifica estructura y secciones obligatorias (cluster, svm)
+- **Errores**: FileNotFoundError, YAMLError, PermissionError
+
+#### save_to_log(operation_name, data)
+Guarda datos en archivo JSON con timestamp en carpeta logs/.
+- **Entrada**: Nombre de operación y diccionario de datos
+- **Salida**: Ruta del archivo creado
+- **Formato**: `logs/operacion_YYYYMMDD_HHMMSS.json`
+- **Funcionalidad**: Crea directorio logs/ automáticamente si no existe
+
+#### cluster_connection(cluster_config)
+Establece y verifica conexión con el cluster NetApp ONTAP.
+- **Entrada**: Diccionario con host, username, password
+- **Salida**: True si conexión exitosa, False si falla
+- **Validaciones**: Verifica credenciales y acceso mediante consulta al cluster
+- **Información mostrada**: Nombre del cluster, versión ONTAP
+
+### Funciones de Gestión de Volúmenes
+
+#### volume_create(volume_config)
+Crea un volumen en NetApp ONTAP con parámetros personalizados.
+- **Entrada**: Configuración de volumen desde config.yaml (name, vserver, aggregate, size, security_style, junction_path, export_policy)
+- **Salida**: True si se creó, False si error
+- **Método**: Volume.post(hydrate=True)
+- **Log**: `volume_create_YYYYMMDD_HHMMSS.json`
+- **Funcionalidad**: 
+  - Crea el volumen
+  - Obtiene detalles completos del volumen creado
+  - Muestra información tipo "volume show"
+  - Guarda log con datos reales de la cabina
+
+#### volume_modify(volume_config)
+Modifica los permisos UNIX de un volumen existente.
+- **Entrada**: Configuración de volumen con unix_permissions (name, vserver, unix_permissions)
+- **Salida**: True si modificación exitosa, False si error
+- **Método**: Volume.patch()
+- **Log**: `volume_modify_YYYYMMDD_HHMMSS.json`
+- **Funcionalidad**:
+  - Busca el volumen por nombre y SVM
+  - Convierte permisos de formato simbólico (rwxrwxrwx) u octal (0777) a entero
+  - Aplica los permisos mediante PATCH
+  - Verifica que los permisos se aplicaron correctamente
+  - Muestra información post-modificación
+  - Guarda log con datos reales de la cabina
+
+### Funciones de Monitoreo
+
+#### get_event_logs(max_records=100)
+Obtiene y respalda los logs de eventos del cluster.
+- **Entrada**: Número máximo de registros (default: 100)
+- **Salida**: True si se obtuvieron, False si error
+- **Método**: EmsEvent.get_collection()
+- **Log**: `event_logs_YYYYMMDD_HHMMSS.json`
+- **Funcionalidad**:
+  - Obtiene eventos del cluster (index, timestamp, nodo, severidad, nombre del evento)
+  - Muestra los primeros 20 eventos en pantalla
+  - Guarda todos los eventos en log JSON
+
+## Registro de Errores
+
+### Errores de Configuración
+
+#### ERR-001: Archivo de configuración no encontrado
+```
+[ERROR] File not found: config.yaml
+```
+**Causa**: El archivo config.yaml no existe en el directorio actual  
+**Solución**: Verificar que config.yaml existe en la misma carpeta que el script
+
+#### ERR-002: YAML inválido
+```
+[ERROR] Invalid YAML format in 'config.yaml'
+[ERROR] Detail: ...
+```
+**Causa**: Sintaxis YAML incorrecta (indentación, formato)  
+**Solución**: Validar sintaxis YAML, verificar espacios e indentación
+
+#### ERR-003: Configuración incompleta
+```
+[ERROR] Incomplete configuration: missing 'cluster' section
+[ERROR] Incomplete configuration: missing 'svm' section
+```
+**Causa**: Faltan secciones obligatorias en config.yaml  
+**Solución**: Asegurar que config.yaml contenga secciones 'cluster' y 'svm'
+
+#### ERR-004: Campos obligatorios faltantes - Cluster
+```
+[ERROR] Missing required fields in cluster config: host, username
+```
+**Causa**: Faltan campos obligatorios en la configuración del cluster  
+**Solución**: Completar todos los campos requeridos (host, username, password)
+
+#### ERR-005: Campos obligatorios faltantes - Volume Create
+```
+[ERROR] Missing required fields in volume config: name, vserver, aggregate
+```
+**Causa**: Faltan campos obligatorios en la configuración del volumen  
+**Solución**: Completar campos: name, vserver, aggregate, size, security_style, junction_path, export_policy
+
+#### ERR-006: Campos obligatorios faltantes - Volume Modify
+```
+[ERROR] Missing required fields in volume config: name, vserver, unix_permissions
+```
+**Causa**: Faltan campos para modificar el volumen  
+**Solución**: Completar campos: name, vserver, unix_permissions
+
+### Errores de Conexión
+
+#### ERR-101: Error de autenticación
+```
+[ERROR] NetApp REST API error
+[ERROR] HTTP status: 401
+[ERROR] Authentication failed
+[ERROR] Invalid username or password for user 'admin'
+```
+**Causa**: Credenciales incorrectas  
+**Solución**: Verificar username y password en config.yaml
+
+#### ERR-102: Acceso denegado
+```
+[ERROR] HTTP status: 403
+[ERROR] Forbidden - User lacks required permissions
+```
+**Causa**: Usuario sin permisos suficientes  
+**Solución**: Usar cuenta con rol admin o vsadmin
+
+#### ERR-103: Host no alcanzable
+```
+[ERROR] Cannot reach host 'cluster1.demo.netapp.com'
+[ERROR] Check network connectivity and hostname/IP
+```
+**Causa**: Problemas de red o hostname incorrecto  
+**Solución**: Verificar conectividad de red y hostname/IP del cluster
+
+#### ERR-104: Timeout de conexión
+```
+[ERROR] Connection timeout to 'cluster1.demo.netapp.com'
+[ERROR] Cluster is not responding
+```
+**Causa**: Cluster no responde  
+**Solución**: Verificar que el cluster esté encendido y accesible
+
+#### ERR-105: Recurso no encontrado
+```
+[ERROR] HTTP status: 404
+[ERROR] Resource not found - Check cluster URL
+```
+**Causa**: URL del cluster incorrecta o recurso no existe  
+**Solución**: Verificar hostname/IP del cluster
+
+### Errores de Creación de Volumen
+
+#### ERR-201: Volumen ya existe
+```
+[ERROR] NetApp API error during volume creation
+[ERROR] HTTP Status: 409
+[ERROR] Details: Volume 'vol_data_01' already exists
+```
+**Causa**: Ya existe un volumen con ese nombre en la SVM  
+**Solución**: Cambiar nombre en config.yaml o eliminar volumen existente
+
+#### ERR-202: Agregado no existe
+```
+[ERROR] Details: Aggregate 'cluster1_01_SSD_1' doesn't exist
+```
+**Causa**: Nombre de agregado incorrecto o no existe  
+**Solución**: Ejecutar `storage aggregate show` para ver agregados disponibles
+
+#### ERR-203: SVM no existe
+```
+[ERROR] Details: SVM 'svm_1_cluster' not found
+```
+**Causa**: La SVM especificada no existe  
+**Solución**: Verificar SVMs con `vserver show`
+
+#### ERR-204: Tamaño inválido
+```
+[ERROR] Details: Invalid size format
+```
+**Causa**: Formato de tamaño incorrecto  
+**Solución**: Usar formatos válidos: 100GB, 1TB, 500MB
+
+#### ERR-205: Security style inválido
+```
+[ERROR] Details: Invalid security_style
+```
+**Causa**: Security style no soportado  
+**Solución**: Usar valores válidos: unix, ntfs, mixed
+
+#### ERR-206: Junction path inválido
+```
+[ERROR] Details: Invalid junction path format
+```
+**Causa**: Formato de junction path incorrecto  
+**Solución**: Usar formato válido: /nombre_volumen (debe comenzar con /)
+
+#### ERR-207: Export policy no existe
+```
+[ERROR] Details: Export policy 'custom_policy' not found
+```
+**Causa**: La export policy especificada no existe  
+**Solución**: Verificar export policies con `vserver export-policy show`
+
+### Errores de Modificación de Volumen
+
+#### ERR-301: Volumen no encontrado
+```
+[ERROR] Volume 'vol_data_01' not found in SVM 'svm_1_cluster'
+```
+**Causa**: El volumen o SVM especificado no existe  
+**Solución**: Verificar nombre del volumen y SVM con `volume show`
+
+#### ERR-302: Formato de permisos inválido
+```
+[ERROR] Invalid unix_permissions format: invalid_format
+[ERROR] Expected formats: 'rwxrwxrwx' or '0777'
+```
+**Causa**: Formato de permisos UNIX incorrecto  
+**Solución**: Usar formato simbólico (rwxrwxrwx) u octal (0777)
+
+#### ERR-303: Verificación de permisos fallida
+```
+[WARNING] VERIFICATION FAILED: Permissions mismatch!
+[WARNING] Expected: 0o777, Got: 0o755
+```
+**Causa**: Los permisos aplicados no coinciden con los solicitados  
+**Solución**: Verificar logs y reintenta la operación; puede ser restricción de la SVM
+
+### Errores de Event Logs
+
+#### ERR-601: No se pueden obtener event logs
+```
+[ERROR] NetApp API error during event log retrieval
+[ERROR] HTTP Status: ...
+```
+**Causa**: Error al consultar API de eventos  
+**Solución**: No crítico, verificar permisos de lectura de eventos
+
+### Códigos de Estado HTTP Comunes
+
+- **400 Bad Request**: Parámetros inválidos en la solicitud
+- **401 Unauthorized**: Credenciales incorrectas
+- **403 Forbidden**: Sin permisos suficientes
+- **404 Not Found**: Recurso no existe (cluster, SVM, volumen, etc.)
+- **409 Conflict**: Recurso ya existe (volumen duplicado)
+- **500 Internal Server Error**: Error interno del servidor ONTAP
+
+## Seguridad
+
+- **IMPORTANTE**: NO compartas el archivo `config.yaml` con credenciales
+- Considera usar variables de entorno para credenciales sensibles
+- El script desactiva verificación SSL (`verify=False`) - úsalo solo en entornos de desarrollo/pruebas
+- Los logs pueden contener información sensible - protege el directorio `logs/`
+- Restringe permisos de archivos de configuración: `chmod 600 config.yaml`
+
+## Equivalencias CLI
+
+Este script automatiza comandos que normalmente se ejecutarían manualmente en la CLI de NetApp ONTAP:
+
+### Creación de Volumen
+```bash
+# CLI equivalente:
+volume create -vserver svm_1_cluster -volume vol_data_01 \
+  -aggregate cluster1_01_SSD_1 -size 500GB \
+  -security-style unix -junction-path /vol_data_01 \
+  -policy default
+
+# Script Python:
+python volume_base.py  # Ejecuta volume_create()
+```
+
+### Modificación de Permisos
+```bash
+# CLI equivalente:
+volume modify -vserver svm_1_cluster -volume vol_data_01 \
+  -unix-permissions ---rwxrwxrwx
+
+# Script Python:
+python volume_base.py  # Ejecuta volume_modify()
+```
+
+### Consulta de Información
+```bash
+# CLI equivalente:
+volume show -vserver svm_1_cluster -volume vol_data_01
+event log show -messagename *
+
+# Script Python:
+# Se ejecuta automáticamente después de cada operación
+# y se guarda en logs/
+```
+
+## Soporte
+
+Para problemas relacionados con la API de NetApp, consulta:
+- [Documentación API REST](https://library.netapp.com/ecmdocs/ECMLP3351667/html/)
+- [NetApp Community](https://community.netapp.com/)
+- [Python Client Library](https://pypi.org/project/netapp-ontap/)
+- [ONTAP Automation Documentation](https://docs.netapp.com/us-en/ontap-automation/)
+
+---
+
+**Versión**: 1.0.0  
+**Última actualización**: Febrero 2026
