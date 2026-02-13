@@ -147,6 +147,7 @@ def save_to_log(operation_name, data):
         print(f"[LOG] Saved to: {filename}")
         return filename
     
+    # CONTROL DE ERRORES
     except Exception as e:
         print(f"[WARNING] Could not save log: {str(e)}")
         return None
@@ -662,7 +663,6 @@ else:
     print("\n[ERROR] Volume modification failed")
     print("[ERROR] Check the error messages above for details")
     exit(1)
-
 
 # EVENT LOGS BACKUP
 # Obtener event logs de la cabina como backup de la operación
