@@ -671,7 +671,3 @@ if get_event_logs(max_records=100):
 else:
     print("\n[WARNING] Event logs backup failed (non-critical)")
 
-print("\n" + "="*80)
-print("  VOLUME MANAGEMENT WORKFLOW COMPLETED SUCCESSFULLY")
-print("="*80)
-print("\n[+] All operations finished. Check logs/ directory for detailed information.")
