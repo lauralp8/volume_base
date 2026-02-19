@@ -23,5 +23,5 @@ volume:
   size: 500GB
   security_style: unix
   junction_path: "/vol_data_01"       
-  export_policy: default
+  export_policy: rhoso
   unix_permissions: rwxrwxrwx
