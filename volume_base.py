@@ -306,7 +306,7 @@ def volume_create(volume_config):
         
         # Obtener la información completa del volumen recién creado
         created_volume = Volume(uuid=volume.uuid)
-        created_volume.get()
+        created_volume.get(fields="uuid,name,svm.name,size,state,style,type,aggregates.name,nas,create_time")
         
         # Preparar datos para el log
         volume_data = {
@@ -462,7 +462,7 @@ def volume_modify(volume_config):
         print(f"\n[*] Retrieving updated volume details from storage array...")
         
         modified_volume = Volume(uuid=volume_found.uuid)
-        modified_volume.get(fields="*")
+        modified_volume.get(fields="uuid,name,svm.name,size,state,style,type,aggregates.name,nas")
         
         # Preparar datos para el log
         volume_data = {
